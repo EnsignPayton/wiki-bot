@@ -1,28 +1,34 @@
 import { RichEmbed } from 'discord.js';
-import { MediaWikiSearchResult } from './dataSources/mediaWiki';
-import { getWikipediaSearchLink, searchWikipedia } from './dataSources/wikipedia';
+import { MediaWikiSearchResult, mediaWikiSources, Source } from './dataSources/mediaWiki';
 
-async function ping(): Promise<string> {
-  return 'pong';
+function searchEmbed({name, search, link, color}: Source) {
+  return async (messageText: string) => {
+    const result = await search(messageText);
+
+    const embed = new RichEmbed()
+      .setTitle(`${name} Search: **${messageText}**`)
+      .setURL(link(messageText))
+      .setColor(color);
+
+    return result.reduce((e: RichEmbed, s: MediaWikiSearchResult) => {
+      return e.addField(s.title, s.snippet);
+    }, embed);
+  };
 }
 
-async function search(messageText: string): Promise<RichEmbed> {
-  const result = await searchWikipedia(messageText);
+const sourceCallbacks = Object.keys(mediaWikiSources)
+  .reduce((result: MessageCallbackDictionary, key: string) => {
+  result[key] = searchEmbed(mediaWikiSources[key]);
+  return result;
+}, {});
 
-  const embed = new RichEmbed()
-    .setTitle(`Wikipedia Search: **${messageText}**`)
-    .setURL(getWikipediaSearchLink(messageText))
-    .setColor(0x56789A);
-
-  const newEmbed = result.reduce((e: RichEmbed, s: MediaWikiSearchResult) => {
-    return e.addField(s.title, s.snippet);
-  }, embed);
-
-  return newEmbed;
-}
-
-async function lore(messageText: string): Promise<string> {
-  return 'Under Construction...';
+async function help(): Promise<string> {
+  return `\`\`\`
+Usage: !<command> <parameters>
+Wiki Search Commands:
+  uesp      - Elder Scrolls
+  wikipedia - Wikipedia
+\`\`\``;
 }
 
 export type MessageCallback = (messageText: string) => Promise<string> | Promise<RichEmbed>;
@@ -32,7 +38,6 @@ export interface MessageCallbackDictionary {
 }
 
 export const callbacks: MessageCallbackDictionary = {
-  ping,
-  search,
-  lore,
+  ...sourceCallbacks,
+  help,
 };
